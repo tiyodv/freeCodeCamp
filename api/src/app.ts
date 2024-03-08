@@ -19,6 +19,7 @@ import Fastify, {
   RawServerDefault
 } from 'fastify';
 
+import Redis from 'ioredis';
 import prismaPlugin from './db/prisma';
 import cors from './plugins/cors';
 import { NodemailerProvider } from './plugins/mail-providers/nodemailer';
@@ -46,7 +47,9 @@ import {
   FCC_ENABLE_DEV_LOGIN_MODE,
   FCC_ENABLE_SWAGGER_UI,
   FREECODECAMP_NODE_ENV,
+  MAX_REQUEST_LIMIT,
   MONGOHQ_URL,
+  REDIS_HOST,
   SENTRY_DSN,
   SESSION_SECRET
 } from './utils/env';
@@ -86,9 +89,14 @@ ajv.addFormat('objectid', {
  *
  * @param options The options to pass to the Fastify constructor.
  * @returns The instantiated Fastify server, with TypeBox.
+ *
+ * @param rateLimitTesting - If true, rate limiting will be enabled for testing.
  */
 export const build = async (
-  options: FastifyHttpOptions<RawServerDefault, FastifyBaseLogger> = {}
+  options: FastifyHttpOptions<RawServerDefault, FastifyBaseLogger> = {
+    logger: true
+  },
+  rateLimitTesting = false
 ): Promise<FastifyInstanceWithTypeProvider> => {
   // TODO: Old API returns 403s for failed validation. We now return 400 (default) from AJV.
   // Watch when implementing in client
@@ -132,6 +140,31 @@ export const build = async (
     });
     done();
   });
+
+  if (rateLimitTesting || FREECODECAMP_NODE_ENV === 'production') {
+    await fastify.register(import('@fastify/rate-limit'), {
+      redis: new Redis({
+        connectionName: 'UserRateLimit',
+        host: REDIS_HOST,
+        connectTimeout: 500,
+        maxRetriesPerRequest: 1
+      }),
+      max: Number(MAX_REQUEST_LIMIT),
+      timeWindow: '1 minute',
+      keyGenerator: req => {
+        // Before setting up the session, we can't use the user's id
+        // That means user is trying to login, so we use the ip address instead.
+
+        // Or if the user is not logged in, we use the ip address.
+
+        if (req.session?.user) {
+          return `${req.ip}:${req.session.user.id}`;
+        }
+
+        return req.ip;
+      }
+    });
+  }
 
   // @ts-expect-error - @fastify/session's types are not, yet, compatible with
   // express-session's types

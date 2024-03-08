@@ -138,6 +138,11 @@ jobs:
         run: |
           cp sample.env .env
           cat .env
+      - name: Start Redis
+        run: |
+          docker run -d --name redis -p 6379:6379 redis:latest
+          # Wait a few seconds to ensure Redis is up
+          sleep 5
 
       - name: Start MongoDB
         uses: supercharge/mongodb-github-action@b0a1493307c4e9b82ed61f3858d606c5ff190c64 # v1.10.0
@@ -188,6 +193,12 @@ jobs:
           echo 'SHOW_NEW_CURRICULUM=true' >> .env
           cat .env
 
+      - name: Start Redis
+        run: |
+          docker run -d --name redis -p 6379:6379 redis:latest
+          # Wait a few seconds to ensure Redis is up
+          sleep 5
+
       - name: Start MongoDB
         uses: supercharge/mongodb-github-action@b0a1493307c4e9b82ed61f3858d606c5ff190c64 # v1.10.0
         with:
@@ -235,6 +246,12 @@ jobs:
         run: |
           cp sample.env .env
           cat .env
+
+      - name: Start Redis
+        run: |
+          docker run -d --name redis -p 6379:6379 redis:latest
+          # Wait a few seconds to ensure Redis is up
+          sleep 5
 
       - name: Start MongoDB
         uses: supercharge/mongodb-github-action@b0a1493307c4e9b82ed61f3858d606c5ff190c64 # v1.10.0
