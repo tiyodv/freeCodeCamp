@@ -1,5 +1,6 @@
 import { type FastifyPluginCallbackTypebox } from '@fastify/type-provider-typebox';
 import { ObjectId } from 'mongodb';
+import { omit } from 'lodash';
 
 import * as schemas from '../schemas';
 // Loopback creates a 64 character string for the user id, this customizes
@@ -20,6 +21,7 @@ import {
 import { encodeUserToken } from '../utils/tokens';
 import { trimTags } from '../utils/validation';
 import { generateReportEmail } from '../utils/email-templates';
+import { challengeTypes } from '../../dist/shared/config/challenge-types';
 
 /**
  * Helper function to get the api url from the shared transcript link.
@@ -529,6 +531,8 @@ export const userGetRoutes: FastifyPluginCallbackTypebox = (
           void res.code(500);
           return { user: {}, result: '' };
         }
+        // TODO: DRY this (the creation of the response body) and
+        // get-public-profile's response body creation.
 
         const encodedToken = userToken
           ? encodeUserToken(userToken.id)
@@ -604,16 +608,37 @@ export const userPublicGetRoutes: FastifyPluginCallbackTypebox = (
       // TODO(Post-MVP): look for duplicates unless we can make username unique in the db.
       const user = await fastify.prisma.user.findFirst({
         where: { username: req.query.username }
+        // TODO: only select desired fields, then stop 'omit'ing the undesired
+        // ones.
       });
+
+      console.log('user', user);
 
       if (!user) {
         void reply.code(404);
         return reply.send({});
       }
 
-      const profileUI = normalizeProfileUI(user.profileUI);
-      if (profileUI.isLocked) {
-        void reply.code(200);
+      const publicUser = omit<typeof user, keyof typeof user>(user, [
+        'currentChallengeId',
+        'email',
+        'emailVerified',
+        'sendQuincyEmail',
+        'theme',
+        'keyboardShortcuts',
+        'acceptedPrivacyTerms',
+        'progressTimestamps',
+        'unsubscribeId',
+        'donationEmails',
+        'externalId',
+        'usernameDisplay',
+        'isBanned' // TODO: should this be omitted?
+      ]);
+
+      const normalizedProfileUI = normalizeProfileUI(user.profileUI);
+
+      void reply.code(200);
+      if (normalizedProfileUI.isLocked) {
         return reply.send({
           // TODO(Post-MVP): just return isLocked and an empty profileUI. No
           // need for entities or result.
@@ -621,8 +646,56 @@ export const userPublicGetRoutes: FastifyPluginCallbackTypebox = (
             user: {
               [user.username]: {
                 isLocked: true,
-                profileUI,
+                profileUI: normalizedProfileUI,
                 username: user.username
+              }
+            }
+          },
+          result: user.username
+        });
+      } else {
+        const normalizedChallenges = normalizedProfileUI.showTimeLine
+          ? normalizeChallenges(user.completedChallenges)
+          : [];
+        return reply.send({
+          entities: {
+            user: {
+              [user.username]: {
+                ...removeNulls(publicUser),
+                about: normalizedProfileUI.showAbout ? user.about : '',
+                calendar: normalizedProfileUI.showHeatMap
+                  ? getCalendar(
+                      user.progressTimestamps as ProgressTimestamp[] | null
+                    )
+                  : {},
+                completedChallenges: normalizedProfileUI.showCerts
+                  ? normalizedChallenges
+                  : normalizedChallenges.filter(
+                      ({ challengeType }) =>
+                        challengeType !== challengeTypes.step // AKA certifications
+                    ),
+                isDonating: normalizedProfileUI.showDonation
+                  ? user.isDonating
+                  : null,
+                joinDate: normalizedProfileUI.showAbout
+                  ? new ObjectId(user.id).getTimestamp().toISOString()
+                  : '',
+                location: normalizedProfileUI.showLocation ? user.location : '',
+                name: normalizedProfileUI.showName ? user.name : '',
+                points: normalizedProfileUI.showPoints
+                  ? getPoints(
+                      user.progressTimestamps as ProgressTimestamp[] | null
+                    )
+                  : 0,
+                portfolio: normalizedProfileUI.showPortfolio
+                  ? user.portfolio
+                  : [],
+                profileUI: normalizedProfileUI,
+                // TODO: should this always be returned? Shouldn't some privacy
+                // setting control it? Same applies to website, githubProfile,
+                // and linkedin.
+                twitter: normalizeTwitter(user.twitter),
+                yearsTopContributor: user.yearsTopContributor
               }
             }
           },
