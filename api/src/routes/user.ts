@@ -1,6 +1,6 @@
 import { type FastifyPluginCallbackTypebox } from '@fastify/type-provider-typebox';
 import { ObjectId } from 'mongodb';
-import { omit } from 'lodash';
+import _ from 'lodash';
 
 import * as schemas from '../schemas';
 // Loopback creates a 64 character string for the user id, this customizes
@@ -8,6 +8,7 @@ import * as schemas from '../schemas';
 import { customNanoid } from '../utils/ids';
 import {
   normalizeChallenges,
+  normalizeFlags,
   normalizeProfileUI,
   normalizeTwitter,
   removeNulls,
@@ -648,27 +649,29 @@ export const userPublicGetRoutes: FastifyPluginCallbackTypebox = (
         // ones.
       });
 
-      console.log('user', user);
-
       if (!user) {
         void reply.code(404);
         return reply.send({});
       }
 
-      const publicUser = omit(user, [
+      const flags = _.pick<typeof user, NullableFlag>(user, nullableFlags);
+      const rest = _.omit<typeof user, NullableFlag>(user, nullableFlags);
+
+      const publicUser = _.omit(rest, [
         'currentChallengeId',
         'email',
         'emailVerified',
         'sendQuincyEmail',
         'theme',
-        'keyboardShortcuts',
+        // keyboardShortcuts is included in flags.
+        // 'keyboardShortcuts',
         'acceptedPrivacyTerms',
         'progressTimestamps',
         'unsubscribeId',
         'donationEmails',
         'externalId',
         'usernameDisplay',
-        'isBanned' // TODO: should this be omitted?
+        'isBanned'
       ]);
 
       const normalizedProfileUI = normalizeProfileUI(user.profileUI);
@@ -693,47 +696,47 @@ export const userPublicGetRoutes: FastifyPluginCallbackTypebox = (
         const normalizedChallenges = normalizedProfileUI.showTimeLine
           ? normalizeChallenges(user.completedChallenges)
           : [];
+
+        const returnedUser = {
+          [user.username]: {
+            ...removeNulls(publicUser),
+            ...normalizeFlags(flags),
+            about: normalizedProfileUI.showAbout ? user.about : '',
+            calendar: normalizedProfileUI.showHeatMap
+              ? getCalendar(
+                  user.progressTimestamps as ProgressTimestamp[] | null
+                )
+              : {},
+            completedChallenges: normalizedProfileUI.showCerts
+              ? normalizedChallenges
+              : normalizedChallenges.filter(
+                  ({ challengeType }) => challengeType !== challengeTypes.step // AKA certifications
+                ),
+            isDonating:
+              normalizedProfileUI.showDonation && user.isDonating ? true : null,
+            joinDate: normalizedProfileUI.showAbout
+              ? new ObjectId(user.id).getTimestamp().toISOString()
+              : '',
+            location:
+              normalizedProfileUI.showLocation && user.location
+                ? user.location
+                : '',
+            name: normalizedProfileUI.showName && user.name ? user.name : '',
+            points: normalizedProfileUI.showPoints
+              ? getPoints(user.progressTimestamps as ProgressTimestamp[] | null)
+              : 0,
+            portfolio: normalizedProfileUI.showPortfolio ? user.portfolio : [],
+            profileUI: normalizedProfileUI,
+            // TODO: should this always be returned? Shouldn't some privacy
+            // setting control it? Same applies to website, githubProfile,
+            // and linkedin.
+            twitter: normalizeTwitter(user.twitter),
+            yearsTopContributor: user.yearsTopContributor
+          }
+        };
         return reply.send({
           entities: {
-            user: {
-              [user.username]: {
-                ...removeNulls(publicUser),
-                about: normalizedProfileUI.showAbout ? user.about : '',
-                calendar: normalizedProfileUI.showHeatMap
-                  ? getCalendar(
-                      user.progressTimestamps as ProgressTimestamp[] | null
-                    )
-                  : {},
-                completedChallenges: normalizedProfileUI.showCerts
-                  ? normalizedChallenges
-                  : normalizedChallenges.filter(
-                      ({ challengeType }) =>
-                        challengeType !== challengeTypes.step // AKA certifications
-                    ),
-                isDonating: normalizedProfileUI.showDonation
-                  ? user.isDonating
-                  : null,
-                joinDate: normalizedProfileUI.showAbout
-                  ? new ObjectId(user.id).getTimestamp().toISOString()
-                  : '',
-                location: normalizedProfileUI.showLocation ? user.location : '',
-                name: normalizedProfileUI.showName ? user.name : '',
-                points: normalizedProfileUI.showPoints
-                  ? getPoints(
-                      user.progressTimestamps as ProgressTimestamp[] | null
-                    )
-                  : 0,
-                portfolio: normalizedProfileUI.showPortfolio
-                  ? user.portfolio
-                  : [],
-                profileUI: normalizedProfileUI,
-                // TODO: should this always be returned? Shouldn't some privacy
-                // setting control it? Same applies to website, githubProfile,
-                // and linkedin.
-                twitter: normalizeTwitter(user.twitter),
-                yearsTopContributor: user.yearsTopContributor
-              }
-            }
+            user: returnedUser
           },
           result: user.username
         });
