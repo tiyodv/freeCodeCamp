@@ -23,6 +23,42 @@ import { trimTags } from '../utils/validation';
 import { generateReportEmail } from '../utils/email-templates';
 import { challengeTypes } from '../../dist/shared/config/challenge-types';
 
+// user flags that the api-server returns as false if they're missing in the
+// user document. Since Prisma returns null for missing fields, we need to
+// normalize them to false.
+// TODO(Post-MVP): remove this when the database is normalized.
+const nullableFlags = [
+  'is2018DataVisCert',
+  'is2018FullStackCert',
+  'isApisMicroservicesCert',
+  'isBackEndCert',
+  'isCheater',
+  'isCollegeAlgebraPyCertV8',
+  'isDataAnalysisPyCertV7',
+  'isDataVisCert',
+  // isDonating doesn't need fixing because it's not nullable
+  'isFoundationalCSharpCertV8',
+  'isFrontEndCert',
+  'isFullStackCert',
+  'isFrontEndLibsCert',
+  'isHonest',
+  'isInfosecCertV7',
+  'isInfosecQaCert',
+  'isJsAlgoDataStructCert',
+  'isJsAlgoDataStructCertV8',
+  'isMachineLearningPyCertV7',
+  'isQaCertV7',
+  'isRelationalDatabaseCertV8',
+  'isRespWebDesignCert',
+  'isSciCompPyCertV7',
+  'isDataAnalysisPyCertV7',
+  // isUpcomingPythonCertV8 exists in the db, but is not returned by the api-server
+  // TODO(Post-MVP): delete it from the db?
+  'keyboardShortcuts'
+] as const;
+
+type NullableFlag = (typeof nullableFlags)[number];
+
 /**
  * Helper function to get the api url from the shared transcript link.
  *
