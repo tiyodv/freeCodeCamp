@@ -53,6 +53,20 @@ Fulfill the user stories and pass all the tests below to complete this project. 
 
 # --hints--
 
+You should have a variable called `price`. 
+
+```js
+price = 10;
+assert.strictEqual(price, 10);
+```
+
+You have a variable called `cid`. 
+
+```js
+cid = []; 
+assert.isDefined(cid); 
+```
+
 You should have an `input` element with an `id` of `"cash"`.
 
 ```js
