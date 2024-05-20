@@ -309,6 +309,7 @@ const Editor = (props: EditorProps): JSX.Element => {
       props.challengeType !== challengeTypes.multifilePythonCertProject
         ? 2
         : 4,
+
     dragAndDrop: true,
     lightbulb: {
       enabled: false
@@ -1248,6 +1249,7 @@ const Editor = (props: EditorProps): JSX.Element => {
 
   useEffect(() => {
     const editor = dataRef.current.editor;
+
     editor?.layout();
     // layout() resets the monaco tab trapping back to default (true), so we
     // need to untrap it if the user had it set to false.
