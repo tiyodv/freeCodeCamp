@@ -8,6 +8,7 @@ import {
   handleStripeCardUpdateSession
 } from '../utils/donation';
 import { validStripeForm } from '../utils/stripeHelpers';
+import { wrapHandledError } from '../utils/create-handled-error';
 
 const log = debug('fcc:boot:donate');
 
@@ -187,7 +188,13 @@ export default function donateBoot(app, done) {
       );
       return res.status(200).json(sessionIdObj);
     } catch (err) {
-      return next(err);
+      return next(
+        wrapHandledError(err, {
+          type: 'danger',
+          message: err.message,
+          status: 403
+        })
+      );
     }
   }
 
