@@ -1,6 +1,5 @@
 import { type FastifyPluginCallbackTypebox } from '@fastify/type-provider-typebox';
 import { ObjectId } from 'mongodb';
-import { isProfane } from 'no-profanity';
 
 import * as schemas from '../schemas';
 // Loopback creates a 64 character string for the user id, this customizes
@@ -21,7 +20,7 @@ import {
 import { encodeUserToken } from '../utils/tokens';
 import { trimTags } from '../utils/validation';
 import { generateReportEmail } from '../utils/email-templates';
-import { blocklistedUsernames } from '../../../shared/config/constants';
+import { isRestricted } from './helpers/is-restricted';
 
 /**
  * Helper function to get the api url from the shared transcript link.
@@ -611,10 +610,7 @@ export const userPublicGetRoutes: FastifyPluginCallbackTypebox = (
 
       const username = req.query.username.toLowerCase();
 
-      const isRestricted =
-        blocklistedUsernames.includes(username) || isProfane(username);
-
-      if (isRestricted) return await reply.send({ exists: true });
+      if (isRestricted(username)) return await reply.send({ exists: true });
 
       const exists =
         (await fastify.prisma.user.count({
