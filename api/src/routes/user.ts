@@ -1,5 +1,6 @@
 import { type FastifyPluginCallbackTypebox } from '@fastify/type-provider-typebox';
 import { ObjectId } from 'mongodb';
+import { isProfane } from 'no-profanity';
 
 import * as schemas from '../schemas';
 // Loopback creates a 64 character string for the user id, this customizes
@@ -20,6 +21,7 @@ import {
 import { encodeUserToken } from '../utils/tokens';
 import { trimTags } from '../utils/validation';
 import { generateReportEmail } from '../utils/email-templates';
+import { blocklistedUsernames } from '../../../shared/config/constants';
 
 /**
  * Helper function to get the api url from the shared transcript link.
@@ -576,6 +578,50 @@ export const userGetRoutes: FastifyPluginCallbackTypebox = (
         void res.code(500);
         return { user: {}, result: '' };
       }
+    }
+  );
+
+  done();
+};
+
+/**
+ * Plugin containing public GET routes for user account management. They are kept
+ * separate because they do not require CSRF protection or authorization.
+ *
+ * @param fastify The Fastify instance.
+ * @param _options Options passed to the plugin via `fastify.register(plugin, options)`.
+ * @param done Callback to signal that the logic has completed.
+ */
+export const userPublicGetRoutes: FastifyPluginCallbackTypebox = (
+  fastify,
+  _options,
+  done
+) => {
+  fastify.get(
+    '/api/users/exists',
+    {
+      schema: schemas.userExists,
+      attachValidation: true
+    },
+    async (req, reply) => {
+      if (req.validationError) {
+        void reply.code(400);
+        return await reply.send({ exists: true });
+      }
+
+      const username = req.query.username.toLowerCase();
+
+      const isRestricted =
+        blocklistedUsernames.includes(username) || isProfane(username);
+
+      if (isRestricted) return await reply.send({ exists: true });
+
+      const exists =
+        (await fastify.prisma.user.count({
+          where: { username }
+        })) > 0;
+
+      await reply.send({ exists });
     }
   );
 
