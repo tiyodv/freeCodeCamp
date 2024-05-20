@@ -256,6 +256,16 @@ export function postChargeStripeCard(
 ): Promise<ResponseWithData<void>> {
   return post('/donate/charge-stripe-card', body);
 }
+
+export function createStripePaymentIntent(body: {
+  payerEmail: string | undefined;
+  payerName: string | undefined;
+}): Promise<
+  ResponseWithData<{ clientSecret: string; subscriptionId: string }>
+> {
+  return post('/donate/create-stripe-payment-intent', body);
+}
+
 interface Report {
   username: string;
   reportDescription: string;
