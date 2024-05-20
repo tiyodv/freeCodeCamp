@@ -41,7 +41,7 @@ import { donateRoutes } from './routes/donate';
 import { emailSubscribtionRoutes } from './routes/email-subscription';
 import { settingRoutes } from './routes/settings';
 import { statusRoute } from './routes/status';
-import { userGetRoutes, userRoutes } from './routes/user';
+import { userGetRoutes, userRoutes, userPublicGetRoutes } from './routes/user';
 import {
   API_LOCATION,
   COOKIE_DOMAIN,
@@ -211,6 +211,7 @@ export const build = async (
   void fastify.register(protectedCertificateRoutes);
   void fastify.register(unprotectedCertificateRoutes);
   void fastify.register(userGetRoutes);
+  void fastify.register(userPublicGetRoutes);
   void fastify.register(deprecatedEndpoints);
   void fastify.register(statusRoute);
   void fastify.register(unsubscribeDeprecated);

@@ -14,11 +14,10 @@ import type {
 } from 'fastify';
 import { ResolveFastifyReplyType } from 'fastify/types/type-provider';
 import { differenceInMinutes } from 'date-fns';
-import { isProfane } from 'no-profanity';
 
-import { blocklistedUsernames } from '../../../shared/config/constants';
 import { isValidUsername } from '../../../shared/utils/validate';
 import * as schemas from '../schemas';
+import { isRestricted } from './helpers/is-restricted';
 
 type WaitMesssageArgs = {
   sentAt: Date | null;
@@ -365,9 +364,6 @@ ${isLinkSentWithinLimitTTL}`
           } as const;
         }
 
-        const isUserNameProfane = isProfane(newUsername);
-        const onBlocklist = blocklistedUsernames.includes(newUsername);
-
         const usernameTaken =
           newUsername === oldUsername
             ? false
@@ -375,7 +371,7 @@ ${isLinkSentWithinLimitTTL}`
                 where: { username: newUsername }
               });
 
-        if (usernameTaken || isUserNameProfane || onBlocklist) {
+        if (usernameTaken || isRestricted(newUsername)) {
           void reply.code(400);
           return {
             message: 'flash.username-taken',
